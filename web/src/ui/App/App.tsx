@@ -39,6 +39,7 @@ triggerCoreBootstrap({
     disableDisplayAllCatalog: env.DISABLE_DISPLAY_ALL_CATALOG,
     getIsDarkModeEnabled: () => evtTheme.state.isDarkModeEnabled,
     S3_envValue: env.S3,
+    LOCATIONS_URL_envValue: env.LOCATIONS_URL,
     AI_envValue: env.AI
 });
 

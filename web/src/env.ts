@@ -1380,6 +1380,11 @@ export const { env, injectEnvsTransferableToKeycloakTheme } = createParsedEnvs([
         envName: "S3",
         isUsedInKeycloakTheme: false,
         validateAndParseOrGetDefault: ({ envValue }) => envValue
+    },
+    {
+        envName: "LOCATIONS_URL",
+        isUsedInKeycloakTheme: false,
+        validateAndParseOrGetDefault: ({ envValue }) => envValue
     }
 ]);
 

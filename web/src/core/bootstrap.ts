@@ -16,6 +16,10 @@ import { createOnyxiaApi } from "core/adapters/onyxiaApi";
 import { assert } from "tsafe/assert";
 import { fnv1aHashToHex } from "core/tools/fnv1aHashToHex";
 import { type S3Config, parseS3ConfigFromEnvValue } from "core/ports/OnyxiaApi/S3Config";
+import {
+    fetchShaheenLocations,
+    mergeShaheenLocations
+} from "core/adapters/shaheenLocations";
 import { type AiConfig, parseAiConfigFromEnvValue } from "core/ports/OnyxiaApi/AiConfig";
 import { setRootContext } from "./rootContext";
 
@@ -34,6 +38,7 @@ export type ParamsOfBootstrapCore = {
     disableDisplayAllCatalog: boolean;
     getIsDarkModeEnabled: () => boolean;
     S3_envValue: string;
+    LOCATIONS_URL_envValue: string;
     AI_envValue: string;
 };
 
@@ -64,8 +69,13 @@ export async function bootstrapCore(
 
     let isCoreCreated = false;
 
-    const s3Config = parseS3ConfigFromEnvValue({
-        envValue: params.S3_envValue
+    // Shaheen: the visitor's own locations join the configured bookmarks. Never
+    // throws; an unreachable URL leaves the S3 config exactly as parsed.
+    const s3Config = mergeShaheenLocations({
+        s3Config: parseS3ConfigFromEnvValue({
+            envValue: params.S3_envValue
+        }),
+        locations: await fetchShaheenLocations({ url: params.LOCATIONS_URL_envValue })
     });
 
     const aiConfig = parseAiConfigFromEnvValue({ envValue: params.AI_envValue });
