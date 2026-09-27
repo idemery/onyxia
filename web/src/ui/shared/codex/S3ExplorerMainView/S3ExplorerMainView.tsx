@@ -36,6 +36,7 @@ import {
     getHasS3ObjectsDragData
 } from "./s3ObjectsDragData";
 import { getS3UrisToDrag } from "./getS3UrisToDrag";
+import { getEmbedderDragEndMessage, getEmbedderOrigin } from "./embedderDragBridge";
 import { getCopyRefusalReason } from "core/usecases/s3ExplorerUiController/decoupledLogic/copyPlan";
 import { S3SelectionActionBar } from "ui/shared/codex/S3SelectionActionBar";
 import {
@@ -198,6 +199,9 @@ export function S3ExplorerMainView(props: S3ExplorerMainViewProps) {
         undefined
     );
     const dragDepthRef = useRef(0);
+    // What the row drag in flight carries, for the embedder bridge; see
+    // embedderDragBridge.ts.
+    const draggedS3UrisRef = useRef<S3Uri[]>([]);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const tableBodyRef = useRef<HTMLTableSectionElement | null>(null);
 
@@ -717,12 +721,39 @@ export function S3ExplorerMainView(props: S3ExplorerMainViewProps) {
             }
 
             setS3ObjectsDragData({ dataTransfer: event.dataTransfer, s3Uris });
+            draggedS3UrisRef.current = s3Uris;
 
             // Nothing here consumes the drag, so the only honest effect to
             // advertise is "copy": the objects stay where they are.
             event.dataTransfer.effectAllowed = "copy";
         }
     );
+
+    // `dragend` fires on the source row and bubbles here. Listening on the
+    // document rather than the row, because a virtualized row can unmount
+    // mid-drag when the list scrolls under it.
+    useEffect(() => {
+        const embedderOrigin = getEmbedderOrigin();
+
+        if (embedderOrigin === undefined) {
+            return;
+        }
+
+        const onDragEnd = (event: globalThis.DragEvent) => {
+            const s3Uris = draggedS3UrisRef.current;
+            draggedS3UrisRef.current = [];
+
+            const message = getEmbedderDragEndMessage({ s3Uris, event });
+
+            if (message !== undefined) {
+                window.parent.postMessage(message, embedderOrigin);
+            }
+        };
+
+        document.addEventListener("dragend", onDragEnd);
+
+        return () => document.removeEventListener("dragend", onDragEnd);
+    }, []);
 
     const handleFileInputChange = useConstCallback(
         (event: ChangeEvent<HTMLInputElement>) => {
