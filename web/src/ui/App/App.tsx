@@ -43,6 +43,14 @@ triggerCoreBootstrap({
     AI_envValue: env.AI
 });
 
+/**
+ * EMBEDDED_HIDE_LEFT_BAR: framed by a host (Shaheen's Maktab frames only the file
+ * explorer), the left bar is a second navigation to pages the host does not offer.
+ * Decided once at load — the app cannot move between framed and top-level.
+ */
+const isLeftBarHidden =
+    import.meta.env.EMBEDDED_HIDE_LEFT_BAR === "true" && window.self !== window.top;
+
 export function App() {
     useRerenderOnStateChange(evtIsScreenScalerOutOfBound);
 
@@ -75,7 +83,7 @@ export function App() {
                 <GlobalDialog />
                 <Header className={classes.header} />
                 <section className={classes.betweenHeaderAndFooter}>
-                    <LeftBar className={classes.leftBar} />
+                    {!isLeftBarHidden && <LeftBar className={classes.leftBar} />}
                     <Main className={classes.main} />
                 </section>
                 <Footer className={classes.footer} />
@@ -133,7 +141,8 @@ const useStyles = tss
                 height: "100%",
                 flex: 1,
                 //TODO: See if scroll delegation works if we put auto here instead of "hidden"
-                paddingLeft: theme.spacing(4),
+                // The gap was the left bar's; without it the page's own margin is enough.
+                paddingLeft: isLeftBarHidden ? 0 : theme.spacing(4),
                 overflow: "hidden"
             }
         };

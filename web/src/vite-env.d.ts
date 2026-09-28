@@ -66,6 +66,8 @@ type ImportMetaEnv = {
   ONYXIA_VERSION: string
   ONYXIA_VERSION_URL: string
   SCREEN_SCALER: string
+  COMPACT_TYPOGRAPHY: string
+  EMBEDDED_HIDE_LEFT_BAR: string
   OIDC_DEBUG_LOGS: string
   OIDC_DISABLE_DPOP: string
   OIDC_SESSION_RESTORATION_METHOD: string

@@ -15,21 +15,61 @@ import { targetWindowInnerWidth } from "ui/theme/targetWindowInnerWidth";
 import { isStorybook } from "ui/tools/isStorybook";
 import { css, cx, emotionCache } from "./emotionCache";
 
+/**
+ * COMPACT_TYPOGRAPHY — sized for a window on a desktop rather than a 1980px page.
+ *
+ * The root font size is what onyxia-ui derives spacing and icon sizes from as well,
+ * so lowering it scales the whole app together. The body and label sizes keep their
+ * proportions (body 1 lands on 14px); the headings are pulled in explicitly, because
+ * at 14px the default page heading would still be 31.5px — a poster inside a window.
+ */
+const isCompactTypography = import.meta.env.COMPACT_TYPOGRAPHY === "true";
+const COMPACT_ROOT_FONT_SIZE_PX = 14;
+const COMPACT_HEADINGS_REM = {
+    "display heading": { fontSizeRem: 1.6, lineHeightRem: 2 },
+    "page heading": { fontSizeRem: 1.25, lineHeightRem: 1.6 },
+    subtitle: { fontSizeRem: 1.1, lineHeightRem: 1.5 },
+    "section heading": { fontSizeRem: 1.1, lineHeightRem: 1.5 },
+    "object heading": { fontSizeRem: 1, lineHeightRem: 1.4 },
+    "navigation label": { fontSizeRem: 1, lineHeightRem: 1.4 }
+} as const;
+
 const {
     OnyxiaUi: OnyxiaUiWithoutEmotionCache,
     evtTheme,
     ofTypeTheme
 } = createOnyxiaUi({
-    getTypographyDesc: params => ({
-        ...defaultGetTypographyDesc({
+    getTypographyDesc: params => {
+        const desc = defaultGetTypographyDesc({
             ...params,
             // We don't want the font to be responsive
             // By default, the font size change depending on the screen size,
             // we don't want that here so we fix the windowInnerWidth.
-            windowInnerWidth: targetWindowInnerWidth
-        }),
-        fontFamily: `'${env.FONT.fontFamily}'`
-    }),
+            windowInnerWidth: targetWindowInnerWidth,
+            ...(isCompactTypography ? { rootFontSizePx: COMPACT_ROOT_FONT_SIZE_PX } : {})
+        });
+        return {
+            ...desc,
+            ...(isCompactTypography
+                ? {
+                      variants: Object.fromEntries(
+                          Object.entries(desc.variants).map(([name, variant]) => [
+                              name,
+                              name in COMPACT_HEADINGS_REM
+                                  ? {
+                                        ...variant,
+                                        ...COMPACT_HEADINGS_REM[
+                                            name as keyof typeof COMPACT_HEADINGS_REM
+                                        ]
+                                    }
+                                  : variant
+                          ])
+                      ) as typeof desc.variants
+                  }
+                : {}),
+            fontFamily: `'${env.FONT.fontFamily}'`
+        };
+    },
     palette: getPalette,
     splashScreenParams: isStorybook
         ? undefined
