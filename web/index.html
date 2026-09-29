@@ -145,11 +145,11 @@ const langAttrAndValue = languageToSetAsHtmlAttr === undefined ? "" : `lang="${l
                     value = new URLSearchParams(location.search).get("theme");
                 } catch(_) {}
 
-                if (value === "light") {
+                if (value === "dark") {
                     return "true";
                 }
 
-                if (value === "dark") {
+                if (value === "light") {
                     return "false";
                 }
 
