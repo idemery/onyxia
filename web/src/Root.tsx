@@ -6,6 +6,7 @@ import {
     loadThemedFavicon
 } from "ui/theme";
 import { listenToEmbedderTheme } from "ui/theme/embedderTheme";
+import { listenToEmbedderPutObjects } from "ui/shared/codex/S3ExplorerMainView/embedderPutObjectsBridge";
 
 injectCustomFontFaceIfNotAlreadyDone();
 loadThemedFavicon();
@@ -16,6 +17,7 @@ export function Root() {
     return (
         <OnyxiaUi>
             <EmbedderTheme />
+            <EmbedderPutObjects />
             <Suspense fallback={<SplashScreen />}>
                 <AppWrapper />
             </Suspense>
@@ -35,6 +37,18 @@ function EmbedderTheme() {
         () => listenToEmbedderTheme({ onIsDarkModeEnabled: setIsDarkModeEnabled }),
         [setIsDarkModeEnabled]
     );
+
+    return null;
+}
+
+/**
+ * Framed, the app uploads files the embedding page took a drop of over it (see
+ * embedderPutObjectsBridge). It listens from the root rather than from the
+ * explorer, so that a drop is answered whatever the app is showing: by the
+ * explorer when it lists a folder, and with the reason when nothing does.
+ */
+function EmbedderPutObjects() {
+    useEffect(() => listenToEmbedderPutObjects(), []);
 
     return null;
 }

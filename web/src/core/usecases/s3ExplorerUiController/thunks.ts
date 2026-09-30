@@ -53,6 +53,18 @@ export const evtDisplayError = Evt.create<{
     errorMessage: string;
 }>();
 
+/**
+ * What became of one object handed to `putObjects`. The upload list shows the
+ * same thing as it happens; this is for a caller that has to report it
+ * somewhere the list is not, and must not claim an upload it did not see land.
+ */
+export type PutObjectOutcome =
+    | { s3Uri: S3Uri.NonTerminatedByDelimiter; status: "uploaded" }
+    | { s3Uri: S3Uri.NonTerminatedByDelimiter; status: "canceled" }
+    /** An object of that name was already there and the user chose to keep it. */
+    | { s3Uri: S3Uri.NonTerminatedByDelimiter; status: "not overwritten" }
+    | { s3Uri: S3Uri.NonTerminatedByDelimiter; status: "failed"; errorMessage: string };
+
 export const thunks = {
     getIsS3ExplorerEnabled:
         () =>
@@ -589,7 +601,7 @@ export const thunks = {
                 blob: Blob;
             }[];
         }) =>
-        async (...args) => {
+        async (...args): Promise<PutObjectOutcome[]> => {
             const { files } = params;
 
             const [dispatch, getState, { evtAction }] = args;
@@ -700,7 +712,7 @@ export const thunks = {
                     )
                 );
 
-            const prPutObject_arr: Promise<void>[] = [];
+            const prPutObject_arr: Promise<PutObjectOutcome>[] = [];
 
             const actionPayloads: {
                 commandLogIssued: {
@@ -737,7 +749,23 @@ export const thunks = {
                             return dAllDispatched.pr;
                         }
                     })
-                );
+                ).catch((error): PutObjectOutcome => {
+                    // A throw, rather than a reported failure, is still the failure
+                    // of this one object. Left rejected, it would never resolve its
+                    // deferred below, and every other file in the batch would wait
+                    // forever for `dAllDispatched` without starting.
+                    console.error(
+                        `Error uploading ${stringifyS3Uri(s3Uri_object)}: `,
+                        error
+                    );
+
+                    return {
+                        s3Uri: s3Uri_object,
+                        status: "failed",
+                        errorMessage:
+                            error instanceof Error ? error.message : String(error)
+                    };
+                });
 
                 prPutObject_arr.push(prPutObject);
 
@@ -762,7 +790,7 @@ export const thunks = {
 
             dAllDispatched.resolve();
 
-            await Promise.all(prPutObject_arr);
+            return Promise.all(prPutObject_arr);
         },
 
     createDirectory:
@@ -1139,7 +1167,7 @@ export const privateThunks = {
                 };
             }) => Promise<void>;
         }) =>
-        async (...args) => {
+        async (...args): Promise<PutObjectOutcome> => {
             const { profileName, s3Uri, blob, doCheckExistence, dispatchProxy } = params;
 
             const [dispatch, , { evtAction }] = args;
@@ -1180,7 +1208,7 @@ export const privateThunks = {
                     const doOverwrite = await dDoOverwrite.pr;
 
                     if (!doOverwrite) {
-                        return;
+                        return { s3Uri, status: "not overwritten" };
                     }
 
                     await dispatch(thunks.delete({ s3Uris: [s3Uri] }));
@@ -1268,9 +1296,9 @@ export const privateThunks = {
 
             switch (resultOfPutObject.status) {
                 case "success":
-                    break;
+                    return { s3Uri, status: "uploaded" };
                 case "canceled":
-                    break;
+                    return { s3Uri, status: "canceled" };
                 case "failed":
                     console.error(
                         `Error uploading ${stringifyS3Uri(s3Uri)}: `,
@@ -1290,7 +1318,16 @@ export const privateThunks = {
                             erroredErrorMessage: resultOfPutObject.error.message
                         })
                     );
-                    break;
+
+                    return {
+                        s3Uri,
+                        status: "failed",
+                        // A store can refuse with a code and an empty message; the
+                        // code is still worth more to the reader than nothing.
+                        errorMessage:
+                            resultOfPutObject.error.message ||
+                            resultOfPutObject.error.name
+                    };
             }
         },
     updateBucketPolicy:

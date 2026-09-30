@@ -37,7 +37,16 @@ import {
 } from "./s3ObjectsDragData";
 import { getS3UrisToDrag } from "./getS3UrisToDrag";
 import { getEmbedderDragEndMessage, getEmbedderOrigin } from "./embedderDragBridge";
+import {
+    getEmbedderPutObjectsAnswer,
+    getEmbedderPutObjectsTarget,
+    getS3UriOfRowAt,
+    registerEmbedderPutObjectsHandler,
+    type EmbedderPutObjectsAnswer,
+    type EmbedderPutObjectsRequest
+} from "./embedderPutObjectsBridge";
 import { getCopyRefusalReason } from "core/usecases/s3ExplorerUiController/decoupledLogic/copyPlan";
+import type { PutObjectOutcome } from "core/usecases/s3ExplorerUiController";
 import { S3SelectionActionBar } from "ui/shared/codex/S3SelectionActionBar";
 import {
     S3DialogItemSummary,
@@ -74,13 +83,19 @@ export type S3ExplorerMainViewProps = {
 
     onNavigateBack: () => void;
 
+    /**
+     * What became of each file, when the caller can tell. It is read only by a
+     * drop handed over by an embedding page (see embedderPutObjectsBridge.ts),
+     * which has no other way to learn the outcome; without it, that page is told
+     * the upload started and nothing more.
+     */
     onPutObjects: (params: {
         files: {
             relativePathSegments: string[];
             fileBasename: string;
             blob: Blob;
         }[];
-    }) => void;
+    }) => Promise<PutObjectOutcome[]> | void;
 
     onCreateDirectory: (params: { prefixSegment: string }) => void;
 
@@ -754,6 +769,52 @@ export function S3ExplorerMainView(props: S3ExplorerMainViewProps) {
 
         return () => document.removeEventListener("dragend", onDragEnd);
     }, []);
+
+    // Files an embedding page received a drop of on this explorer's behalf; see
+    // embedderPutObjectsBridge.ts. The same upload as a drop from the operating
+    // system, aimed at the folder row under the drop point when there is one.
+    const handleEmbedderPutObjects = useConstCallback(
+        async (request: EmbedderPutObjectsRequest): Promise<EmbedderPutObjectsAnswer> => {
+            const s3UriStrUnderPoint = getS3UriOfRowAt(
+                document.elementFromPoint(request.clientX, request.clientY)
+            );
+
+            const target = getEmbedderPutObjectsTarget({
+                listedPrefix,
+                isListing,
+                isUploadToListedPrefixDisabled,
+                itemUnderPoint:
+                    s3UriStrUnderPoint === undefined
+                        ? undefined
+                        : itemByKey.get(s3UriStrUnderPoint)
+            });
+
+            if (target.isRefused) {
+                return target.answer;
+            }
+
+            const { destinationS3Uri, relativePathSegments } = target;
+
+            const prOutcomes = onPutObjects({
+                files: request.files.map(file => ({
+                    relativePathSegments,
+                    fileBasename: file.name,
+                    blob: file
+                }))
+            });
+
+            return getEmbedderPutObjectsAnswer({
+                destinationS3Uri,
+                fileNames: request.files.map(file => file.name),
+                outcomes: prOutcomes === undefined ? undefined : await prOutcomes
+            });
+        }
+    );
+
+    useEffect(
+        () => registerEmbedderPutObjectsHandler(handleEmbedderPutObjects),
+        [handleEmbedderPutObjects]
+    );
 
     const handleFileInputChange = useConstCallback(
         (event: ChangeEvent<HTMLInputElement>) => {
@@ -2851,6 +2912,9 @@ const ItemRow = memo(function ItemRow(props: ItemRowProps) {
         <tr
             ref={measureElement}
             data-index={virtualIndex}
+            // Which item this row shows, for a drop handed over by an embedding
+            // page (ROW_S3_URI_ATTRIBUTE in embedderPutObjectsBridge.ts).
+            data-s3-uri={s3UriStr}
             style={{
                 transform: `translateY(${virtualStart}px)`
             }}
