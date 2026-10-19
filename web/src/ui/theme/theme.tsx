@@ -14,6 +14,8 @@ import { pluginSystemInitTheme } from "pluginSystem";
 import { targetWindowInnerWidth } from "ui/theme/targetWindowInnerWidth";
 import { isStorybook } from "ui/tools/isStorybook";
 import { css, cx, emotionCache } from "./emotionCache";
+import { useSyncExternalStore } from "react";
+import { getEmbedderPaletteName, subscribeToEmbedderPalette } from "./embedderPalette";
 
 /**
  * COMPACT_TYPOGRAPHY — sized for a window on a desktop rather than a 1980px page.
@@ -71,6 +73,8 @@ const {
         };
     },
     palette: getPalette,
+    // The palette also depends on the one an embedding page names (embedderPalette).
+    getPaletteKey: getEmbedderPaletteName,
     splashScreenParams: isStorybook
         ? undefined
         : {
@@ -97,6 +101,9 @@ pluginSystemInitTheme({
 
 export function OnyxiaUi(props: { children: React.ReactNode; darkMode?: boolean }) {
     const { children, darkMode } = props;
+    // Drawn again when the embedding page names another palette, so the theme is
+    // created again under its new key.
+    useSyncExternalStore(subscribeToEmbedderPalette, getEmbedderPaletteName);
     return (
         <CacheProvider value={emotionCache}>
             <OnyxiaUiWithoutEmotionCache darkMode={darkMode ?? env.DARK_MODE}>

@@ -6,6 +6,7 @@ import {
     loadThemedFavicon
 } from "ui/theme";
 import { listenToEmbedderTheme } from "ui/theme/embedderTheme";
+import { setEmbedderPaletteName } from "ui/theme/embedderPalette";
 import { listenToEmbedderPutObjects } from "ui/shared/codex/S3ExplorerMainView/embedderPutObjectsBridge";
 
 injectCustomFontFaceIfNotAlreadyDone();
@@ -26,15 +27,19 @@ export function Root() {
 }
 
 /**
- * Framed, the app wears the embedding page's colour scheme (see embedderTheme). It
- * listens from the root, beside the splash screen, so the page's answer can land
- * before the app itself has finished loading.
+ * Framed, the app wears the embedding page's colour scheme and palette (see
+ * embedderTheme). It listens from the root, beside the splash screen, so the page's
+ * answer can land before the app itself has finished loading.
  */
 function EmbedderTheme() {
     const { setIsDarkModeEnabled } = useDarkMode();
 
     useEffect(
-        () => listenToEmbedderTheme({ onIsDarkModeEnabled: setIsDarkModeEnabled }),
+        () =>
+            listenToEmbedderTheme({
+                onIsDarkModeEnabled: setIsDarkModeEnabled,
+                onPaletteName: setEmbedderPaletteName
+            }),
         [setIsDarkModeEnabled]
     );
 

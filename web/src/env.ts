@@ -37,6 +37,12 @@ export const PUBLIC_URL = (() => {
     return BASE_URL === "/" ? "" : BASE_URL.replace(/\/$/, "");
 })();
 
+/** A palette an embedding page can choose by name (PALETTE_OVERRIDE_NAMED). */
+export type NamedPaletteOverride = {
+    light?: DeepPartial<PaletteBase>;
+    dark?: DeepPartial<PaletteBase>;
+};
+
 export const { env, injectEnvsTransferableToKeycloakTheme } = createParsedEnvs([
     {
         envName: "ONYXIA_API_URL",
@@ -160,6 +166,48 @@ export const { env, injectEnvsTransferableToKeycloakTheme } = createParsedEnvs([
             );
 
             return paletteOverride;
+        }
+    },
+    {
+        envName: "PALETTE_OVERRIDE_NAMED",
+        isUsedInKeycloakTheme: false,
+        validateAndParseOrGetDefault: ({
+            envValue,
+            envName
+        }): Record<string, NamedPaletteOverride> => {
+            if (envValue === "") {
+                return {};
+            }
+
+            let namedPalettes: unknown;
+
+            try {
+                namedPalettes = JSON5.parse(envValue);
+            } catch {
+                throw new Error(`${envName} is not parsable JSON5: ${envValue}`);
+            }
+
+            const isObject = (value: unknown): value is Record<string, unknown> =>
+                typeof value === "object" && value !== null && !(value instanceof Array);
+
+            assert(
+                typeGuard<Record<string, NamedPaletteOverride>>(
+                    namedPalettes,
+                    isObject(namedPalettes) &&
+                        Object.values(namedPalettes).every(
+                            override =>
+                                isObject(override) &&
+                                Object.entries(override).every(
+                                    ([mode, palette]) =>
+                                        (mode === "light" || mode === "dark") &&
+                                        isObject(palette)
+                                )
+                        )
+                ),
+                `${envName} should be a JSON object of { light, dark } palette overrides by name`
+            );
+
+            return namedPalettes;
         }
     },
     {

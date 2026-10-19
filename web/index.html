@@ -221,9 +221,50 @@ const langAttrAndValue = languageToSetAsHtmlAttr === undefined ? "" : `lang="${l
                     return isDarkModeEnabled ? "#2C323F" : "#F1F0EB";
 
                 });
+
+                // The grounds of the palettes an embedding page can name
+                // (PALETTE_OVERRIDE_NAMED, see src/ui/theme/embedderPalette.ts).
+                const PALETTE_OVERRIDE_NAMED = import.meta.env.PALETTE_OVERRIDE_NAMED;
+
+                const namedPalettes = PALETTE_OVERRIDE_NAMED === "" ? {} : JSON5.parse(PALETTE_OVERRIDE_NAMED);
+
+                const namedBackgroundColors = {};
+
+                Object.keys(namedPalettes).forEach(name => {
+                    const { light, dark } = namedPalettes[name] ?? {};
+                    namedBackgroundColors[name] = [light?.light?.main ?? null, dark?.dark?.main ?? null];
+                });
             %>
 
-            const backgroundColor = isDarkModeEnabled ? "<%= backgroundColorWhenDarkMode %>" : "<%= backgroundColorWhenLightMode %>";
+            const backgroundColor = (() => {
+
+                const namedBackgroundColors = <%- JSON.stringify(namedBackgroundColors).replace(/</g, "\\u003c") %>;
+
+                let paletteName = null;
+
+                if (window.self !== window.top) {
+                    try {
+                        paletteName = new URLSearchParams(location.search).get("palette");
+                    } catch(_) {}
+
+                    if (paletteName === null) {
+                        try {
+                            paletteName = sessionStorage.getItem("onyxia:embedder-palette");
+                        } catch(_) {}
+                    }
+                }
+
+                const named =
+                    paletteName !== null && Object.prototype.hasOwnProperty.call(namedBackgroundColors, paletteName)
+                        ? namedBackgroundColors[paletteName][isDarkModeEnabled ? 1 : 0]
+                        : null;
+
+                if (named !== null) {
+                    return named;
+                }
+
+                return isDarkModeEnabled ? "<%= backgroundColorWhenDarkMode %>" : "<%= backgroundColorWhenLightMode %>";
+            })();
             
             document.documentElement.style.backgroundColor = backgroundColor;
             

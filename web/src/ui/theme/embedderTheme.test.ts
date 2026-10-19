@@ -3,6 +3,7 @@ import {
     EMBEDDER_SET_THEME_MESSAGE,
     EMBEDDER_THEME_READY_MESSAGE,
     listenToEmbedderTheme,
+    parseEmbedderPaletteName,
     parseEmbedderSetThemeMessage
 } from "./embedderTheme";
 
@@ -37,6 +38,38 @@ describe("parseEmbedderSetThemeMessage", () => {
         ).toBeUndefined();
         expect(parseEmbedderSetThemeMessage("dark")).toBeUndefined();
         expect(parseEmbedderSetThemeMessage(null)).toBeUndefined();
+    });
+});
+
+describe("parseEmbedderPaletteName", () => {
+    it("reads the palette a set-theme message names", () => {
+        expect(
+            parseEmbedderPaletteName({
+                type: EMBEDDER_SET_THEME_MESSAGE,
+                theme: "dark",
+                palette: "tcc"
+            })
+        ).toBe("tcc");
+    });
+
+    it("reads none from a message without one, or from any other message", () => {
+        expect(
+            parseEmbedderPaletteName({ type: EMBEDDER_SET_THEME_MESSAGE, theme: "dark" })
+        ).toBeUndefined();
+        expect(
+            parseEmbedderPaletteName({
+                type: EMBEDDER_SET_THEME_MESSAGE,
+                theme: "blue",
+                palette: "tcc"
+            })
+        ).toBeUndefined();
+        expect(
+            parseEmbedderPaletteName({
+                type: EMBEDDER_SET_THEME_MESSAGE,
+                theme: "dark",
+                palette: 7
+            })
+        ).toBeUndefined();
     });
 });
 
@@ -85,6 +118,19 @@ describe("listenToEmbedderTheme", () => {
         receive({ type: EMBEDDER_SET_THEME_MESSAGE, theme: "light" });
         receive({ type: EMBEDDER_SET_THEME_MESSAGE, theme: "dark" });
         expect(seen).toEqual([false, true]);
+    });
+
+    it("follows the embedder's palette, before its scheme, and keeps it when unnamed", () => {
+        const { win, receive } = framedWindow();
+        const seen: string[] = [];
+        listenToEmbedderTheme({
+            win,
+            onIsDarkModeEnabled: v => seen.push(v ? "dark" : "light"),
+            onPaletteName: name => seen.push(name)
+        });
+        receive({ type: EMBEDDER_SET_THEME_MESSAGE, theme: "dark", palette: "tcc" });
+        receive({ type: EMBEDDER_SET_THEME_MESSAGE, theme: "light" });
+        expect(seen).toEqual(["tcc", "dark", "light"]);
     });
 
     it("hears only its parent, from the origin that framed it", () => {

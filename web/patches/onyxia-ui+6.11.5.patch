@@ -1,0 +1,53 @@
+diff --git a/node_modules/onyxia-ui/lib/OnyxiaUi.d.ts b/node_modules/onyxia-ui/lib/OnyxiaUi.d.ts
+index 4d0dd1f..48b8ac6 100644
+--- a/node_modules/onyxia-ui/lib/OnyxiaUi.d.ts
++++ b/node_modules/onyxia-ui/lib/OnyxiaUi.d.ts
+@@ -26,6 +26,11 @@ export declare function createOnyxiaUi<Palette extends PaletteBase = PaletteBase
+     splashScreenParams?: SplashScreenParams;
+     defaultIsDarkModeEnabled?: boolean;
+     getIconUrl?: (iconName: string) => string;
++    /**
++     * For a palette that depends on more than the dark mode: a key for that more.
++     * The theme is created again whenever it changes, at the next render of <OnyxiaUi />.
++     */
++    getPaletteKey?: () => string;
+ }): {
+     OnyxiaUi: (props: {
+         /** To dynamically force the mode */
+diff --git a/node_modules/onyxia-ui/lib/OnyxiaUi.js b/node_modules/onyxia-ui/lib/OnyxiaUi.js
+index 71d3ea8..3e7dd44 100644
+--- a/node_modules/onyxia-ui/lib/OnyxiaUi.js
++++ b/node_modules/onyxia-ui/lib/OnyxiaUi.js
+@@ -53,10 +53,12 @@ export function createOnyxiaUi(params) {
+     hasCreateOnyxiaUiBeenCalled = true;
+     const { isScoped = false, splashScreenParams, defaultIsDarkModeEnabled = getIsDarkModeEnabledOsDefault(), getIconUrl = () => {
+         throw new Error("No dynamic icon resolver have been configured. Checkout @onyxia-ui/icons");
+-    } } = params, paramsOfCreateTheme = __rest(params, ["isScoped", "splashScreenParams", "defaultIsDarkModeEnabled", "getIconUrl"]);
++    }, getPaletteKey = () => "" } = params, paramsOfCreateTheme = __rest(params, ["isScoped", "splashScreenParams", "defaultIsDarkModeEnabled", "getIconUrl", "getPaletteKey"]);
+     const { memoizedCreateTheme } = (() => {
+         const { createTheme } = createThemeFactory(paramsOfCreateTheme);
+-        const memoizedCreateTheme = memoize((isDarkModeEnabled, windowInnerWidth, rootFontSizePx) => {
++        // The palette key joins the cache key: a palette that depends on more than the
++        // dark mode gets a new theme when that more changes.
++        const memoizedCreateTheme = memoize((isDarkModeEnabled, windowInnerWidth, rootFontSizePx, _paletteKey) => {
+             const theme = createTheme({
+                 isDarkModeEnabled,
+                 windowInnerWidth,
+@@ -131,7 +133,7 @@ export function createOnyxiaUi(params) {
+         assert(isDarkModeEnabledContextValue !== undefined);
+         useRerenderOnStateChange(evtWindowInnerSize);
+         useRerenderOnStateChange(evtRootFontSizePx);
+-        const theme = memoizedCreateTheme(isDarkModeEnabledContextValue.isDarkModeEnabled, evtWindowInnerSize.state.windowInnerWidth, evtRootFontSizePx.state);
++        const theme = memoizedCreateTheme(isDarkModeEnabledContextValue.isDarkModeEnabled, evtWindowInnerSize.state.windowInnerWidth, evtRootFontSizePx.state, getPaletteKey());
+         return (_jsx(themeContext.Provider, Object.assign({ value: theme }, { children: children })));
+     }
+     function MuiThemeProvider(props) {
+@@ -165,7 +167,7 @@ export function createOnyxiaUi(params) {
+         ])
+             .toStateful()
+             .pipe(() => [
+-            Object.assign(Object.assign({}, memoizedCreateTheme(evtIsDarkModeEnabled.state, evtWindowInnerSize.state.windowInnerWidth, evtRootFontSizePx.state)), { setIsDarkModeEnabled: (isDarkModeEnabled) => {
++            Object.assign(Object.assign({}, memoizedCreateTheme(evtIsDarkModeEnabled.state, evtWindowInnerSize.state.windowInnerWidth, evtRootFontSizePx.state, getPaletteKey())), { setIsDarkModeEnabled: (isDarkModeEnabled) => {
+                     evtIsDarkModeEnabled.state = isDarkModeEnabled;
+                 } }),
+         ]);
